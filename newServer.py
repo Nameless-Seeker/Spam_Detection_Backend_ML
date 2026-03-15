@@ -23,6 +23,13 @@ from tensorflow.keras.models import load_model
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+phoneme_model = None
+repetition_model = None
+embedder = None
+intent_embeddings = None
+
+executor = ThreadPoolExecutor(max_workers=4)
+
 warnings.filterwarnings("ignore")
 
 from config import SR, MIN_SPEECH_S
@@ -44,11 +51,10 @@ SLICE_SEC             = 1
 REP_THRESHOLD         = 0.6
 
 WINDOW_SEC      = 4          # seconds captured per window
-WHISPER_CLI     = r"whisper.cpp/build/bin/Release/whisper-cli.exe"   # change to full path if not in PATH
-                                   # e.g. r"C:\whisper.cpp\build\bin\whisper-cli.exe"
+WHISPER_CLI = "./whisper.cpp/build/bin/whisper-cli"
 WHISPER_MODEL   = "tiny"     # tiny / base / small / medium
 WHISPER_LANG    = "en"     # auto-detect, or "en", "hi"
-MODEL_PATH = r"models\ggml-tiny.en.bin"
+MODEL_PATH = r"models/ggml-tiny.en.bin"
 SIMILARITY_GATE = 0.55       # minimum cosine similarity to count as a stage match
 
 URGENCY_MAP = {0: 0.0, 1: 0.2, 2: 0.5, 3: 0.9}
@@ -225,16 +231,34 @@ STAGE_LABELS = {0:"none", 1:"GREETING", 2:"AUTHORITY", 3:"PROBLEM", 4:"URGENCY",
 # ─────────────────────────────────────────────
 # LOAD MODELS ONCE AT STARTUP
 # ─────────────────────────────────────────────
-print("Loading models...")
-phoneme_model    = load_model(PHONEME_MODEL_PATH)
-repetition_model = load_model(REPETITION_MODEL_PATH)
-embedder         = SentenceTransformer("all-MiniLM-L6-v2")
-intent_embeddings = {
-    intent: embedder.encode(sentences)
-    for intent, sentences in INTENTS.items()
-}
-executor = ThreadPoolExecutor(max_workers=4)
-print("All models loaded.\n")
+#print("Loading models...")
+# phoneme_model    = load_model(PHONEME_MODEL_PATH)
+# repetition_model = load_model(REPETITION_MODEL_PATH)
+# embedder         = SentenceTransformer("all-MiniLM-L6-v2")
+# intent_embeddings = {
+#     intent: embedder.encode(sentences)
+#     for intent, sentences in INTENTS.items()
+# }
+# executor = ThreadPoolExecutor(max_workers=4)
+# print("All models loaded.\n")
+@app.on_event("startup")
+def load_models():
+
+    global phoneme_model, repetition_model, embedder, intent_embeddings
+
+    print("Loading models...")
+
+    phoneme_model = load_model(PHONEME_MODEL_PATH)
+    repetition_model = load_model(REPETITION_MODEL_PATH)
+
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+    intent_embeddings = {
+        intent: embedder.encode(sentences)
+        for intent, sentences in INTENTS.items()
+    }
+
+    print("All models loaded.")
 
 app = FastAPI()
 
